@@ -1,12 +1,62 @@
-# [Flappy Bird](https://youtu.be/OCE2Es_Y5X0)
-- Coding Tutorial: [https://youtu.be/OCE2Es_Y5X0](https://youtu.be/OCE2Es_Y5X0)
+# Flappy Bird — Shadow World
 
-How to code flappy bird game in python. In this tutorial, you will learn how to code flappy bird using the pygame module in python.
+A Flappy Bird clone with a twist: **Shadow World**. As you score higher, darkness creeps across the screen. A shrinking spotlight follows your bird — survive the shadows or be swallowed.
 
-Throughout the tutorial, you will learn how to create the game loop, create a game window, draw images on the game window, add click handlers to make the flappy bird jump, randomly generate pipes and move them across the screen, detect collisions between the flappy bird and each pipe, and add a running score. 
+## The Twist
 
-[How to setup Python with Visual Studio Code](https://youtu.be/9o4gDQvVkLU)
+After scoring 4 points, the screen starts going dark. A glowing circle of light surrounds the bird — that's all you can see. The longer you survive:
 
-[How to install Pygame](https://youtu.be/5uOTEOJ48G8 )
+- **Darkness intensifies** — opacity climbs toward 180, with a breathing pulse effect
+- **Your spotlight shrinks** — the glow radius gets smaller every point
+- **Darkness accelerates** — the rate increases the higher you score
+- **Pipe relief** — passing a pipe pair briefly drops the darkness
 
-![flappybird-python-ss](https://github.com/user-attachments/assets/dc908d1c-1471-4c19-bc85-466a7b7545a9)
+## Controls
+
+| Input | Action |
+|-------|--------|
+| Space / Click / Tap | Flap |
+| P / Pause button | Pause / Resume |
+| ESC | Quit (or unpause) |
+
+## Features
+
+- Day/Night mode toggle with parallax city backgrounds
+- 5 SFX + 5 BGM tracks (day and night variants)
+- Music & SFX toggles via settings panel
+- Death tumble animation with screen shake
+- Score pop effect and medal tiers (Bronze → Platinum)
+- Pause/Play support
+- Phone simulation mode (`--phone` flag)
+- Responsive layout for landscape and portrait
+
+## How to Run
+
+```
+pip install pygame
+python flappybird.py
+```
+
+Phone mode:
+```
+python flappybird.py --phone
+```
+
+## Requirements
+
+- Python 3.10+
+- pygame 2.x
+
+## Project Structure
+
+```
+flappybird.py              Main game file
+FlappySound/               SFX and BGM audio files
+free-scrolling-city-backgrounds-pixel-art/   Night parallax layers
+Backgroundfull.png         Day background
+flappybird.png             Bird sprite
+toppipe.png / bottompipe.png   Pipe sprites
+day-and-night.png          Day/Night toggle icon
+volume.png                 Sound settings icon
+pause.png / play-buttton.png   Pause/Play icons
+```
