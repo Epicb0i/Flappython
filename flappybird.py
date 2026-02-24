@@ -1,22 +1,28 @@
 import pygame
-from sys import exit, argv
+import sys
+import asyncio
 import random
 import math
 import os
 
-PHONE_SIM = "--phone" in argv
+IS_WEB = sys.platform == "emscripten"
+PHONE_SIM = "--phone" in sys.argv and not IS_WEB
 
 pygame.init()
-screen_info = pygame.display.Info()
 
-if PHONE_SIM:
-    # Simulate a typical smartphone screen (412×915 scaled to fit monitor)
+if IS_WEB:
+    SCREEN_W, SCREEN_H = 800, 450
+    window = pygame.display.set_mode((SCREEN_W, SCREEN_H))
+    pygame.display.set_caption("Flappy Bird — Shadow World")
+elif PHONE_SIM:
+    screen_info = pygame.display.Info()
     _monitor_h = screen_info.current_h
     SCREEN_H = int(_monitor_h * 0.9)           # 90% of monitor height
     SCREEN_W = int(SCREEN_H * 0.45)            # ~9:20 aspect ratio (modern phone)
     window = pygame.display.set_mode((SCREEN_W, SCREEN_H))
     pygame.display.set_caption("Flappy Bird — Shadow World [PHONE MODE]")
 else:
+    screen_info = pygame.display.Info()
     SCREEN_W = screen_info.current_w
     SCREEN_H = screen_info.current_h
     window = pygame.display.set_mode((SCREEN_W, SCREEN_H), pygame.FULLSCREEN)
@@ -787,35 +793,79 @@ def draw():
         draw_game_over_screen()
 
 
-while True:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            exit()
 
-        if event.type == create_pipes_timer and game_started and not game_over and not game_paused:
-            create_pipes()
+async def main():
+    global game_started, show_splash, game_paused, dark_mode
+    global settings_open, music_enabled, sfx_enabled
 
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return
+
+            if event.type == create_pipes_timer and game_started and not game_over and not game_paused:
+                create_pipes()
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    if game_paused:
+                        game_paused = False
+                    else:
+                        pygame.quit()
+                        return
+                if event.key == pygame.K_p and game_started and not game_over and not dying:
+                    game_paused = not game_paused
+                    if game_paused:
+                        pygame.mixer.music.pause()
+                    else:
+                        pygame.mixer.music.unpause()
+                if event.key in (pygame.K_SPACE, pygame.K_x, pygame.K_UP):
+                    if game_paused:
+                        pass
+                    elif dying:
+                        pass
+                    elif game_over:
+                        reset_game()
+                    else:
+                        if not game_started:
+                            game_started = True
+                            show_splash = False
+                            sfx_swoosh.play()
+                            play_bgm()
+                        bird.flap()
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if pause_btn.collidepoint(event.pos) and game_started and not game_over and not dying:
+                    game_paused = not game_paused
+                    if game_paused:
+                        pygame.mixer.music.pause()
+                    else:
+                        pygame.mixer.music.unpause()
+                    continue
                 if game_paused:
-                    game_paused = False
-                else:
-                    pygame.quit()
-                    exit()
-            if event.key == pygame.K_p and game_started and not game_over and not dying:
-                game_paused = not game_paused
-                if game_paused:
-                    pygame.mixer.music.pause()
-                else:
-                    pygame.mixer.music.unpause()
-            if event.key in (pygame.K_SPACE, pygame.K_x, pygame.K_UP):
-                if game_paused:
-                    pass
+                    continue
+                if settings_open and settings_panel.collidepoint(event.pos):
+                    if music_toggle_rect.collidepoint(event.pos):
+                        music_enabled = not music_enabled
+                        apply_music_volume()
+                    elif sfx_toggle_rect.collidepoint(event.pos):
+                        sfx_enabled = not sfx_enabled
+                        apply_sfx_volume()
+                    continue
+                if settings_btn.collidepoint(event.pos):
+                    settings_open = not settings_open
+                    continue
+                if settings_open:
+                    settings_open = False
+                if toggle_btn.collidepoint(event.pos):
+                    dark_mode = not dark_mode
+                    play_bgm(force_restart=True)
                 elif dying:
                     pass
                 elif game_over:
-                    reset_game()
+                    if restart_button.collidepoint(event.pos):
+                        reset_game()
                 else:
                     if not game_started:
                         game_started = True
@@ -824,102 +874,66 @@ while True:
                         play_bgm()
                     bird.flap()
 
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if pause_btn.collidepoint(event.pos) and game_started and not game_over and not dying:
-                game_paused = not game_paused
+            if event.type == pygame.FINGERDOWN:
+                tx = int(event.x * SCREEN_W)
+                ty = int(event.y * SCREEN_H)
+                if pause_btn.collidepoint(tx, ty) and game_started and not game_over and not dying:
+                    game_paused = not game_paused
+                    if game_paused:
+                        pygame.mixer.music.pause()
+                    else:
+                        pygame.mixer.music.unpause()
+                    continue
                 if game_paused:
-                    pygame.mixer.music.pause()
+                    continue
+                if settings_open and settings_panel.collidepoint(tx, ty):
+                    if music_toggle_rect.collidepoint(tx, ty):
+                        music_enabled = not music_enabled
+                        apply_music_volume()
+                    elif sfx_toggle_rect.collidepoint(tx, ty):
+                        sfx_enabled = not sfx_enabled
+                        apply_sfx_volume()
+                    continue
+                if settings_btn.collidepoint(tx, ty):
+                    settings_open = not settings_open
+                    continue
+                if settings_open:
+                    settings_open = False
+                if toggle_btn.collidepoint(tx, ty):
+                    dark_mode = not dark_mode
+                    play_bgm(force_restart=True)
+                elif dying:
+                    pass
+                elif game_over:
+                    if restart_button.collidepoint(tx, ty):
+                        reset_game()
                 else:
-                    pygame.mixer.music.unpause()
-                continue
-            if game_paused:
-                continue
-            if settings_open and settings_panel.collidepoint(event.pos):
-                if music_toggle_rect.collidepoint(event.pos):
-                    music_enabled = not music_enabled
-                    apply_music_volume()
-                elif sfx_toggle_rect.collidepoint(event.pos):
-                    sfx_enabled = not sfx_enabled
-                    apply_sfx_volume()
-                continue
-            if settings_btn.collidepoint(event.pos):
-                settings_open = not settings_open
-                continue
-            if settings_open:
-                settings_open = False
-            if toggle_btn.collidepoint(event.pos):
-                dark_mode = not dark_mode
-                play_bgm(force_restart=True)
-            elif dying:
-                pass
-            elif game_over:
-                if restart_button.collidepoint(event.pos):
-                    reset_game()
-            else:
-                if not game_started:
-                    game_started = True
-                    show_splash = False
-                    sfx_swoosh.play()
-                    play_bgm()
-                bird.flap()
+                    if not game_started:
+                        game_started = True
+                        show_splash = False
+                        sfx_swoosh.play()
+                        play_bgm()
+                    bird.flap()
 
-        if event.type == pygame.FINGERDOWN:
-            tx = int(event.x * SCREEN_W)
-            ty = int(event.y * SCREEN_H)
-            if pause_btn.collidepoint(tx, ty) and game_started and not game_over and not dying:
-                game_paused = not game_paused
-                if game_paused:
-                    pygame.mixer.music.pause()
-                else:
-                    pygame.mixer.music.unpause()
-                continue
-            if game_paused:
-                continue
-            if settings_open and settings_panel.collidepoint(tx, ty):
-                if music_toggle_rect.collidepoint(tx, ty):
-                    music_enabled = not music_enabled
-                    apply_music_volume()
-                elif sfx_toggle_rect.collidepoint(tx, ty):
-                    sfx_enabled = not sfx_enabled
-                    apply_sfx_volume()
-                continue
-            if settings_btn.collidepoint(tx, ty):
-                settings_open = not settings_open
-                continue
-            if settings_open:
-                settings_open = False
-            if toggle_btn.collidepoint(tx, ty):
-                dark_mode = not dark_mode
-                play_bgm(force_restart=True)
-            elif dying:
-                pass
-            elif game_over:
-                if restart_button.collidepoint(tx, ty):
-                    reset_game()
-            else:
-                if not game_started:
-                    game_started = True
-                    show_splash = False
-                    sfx_swoosh.play()
-                    play_bgm()
-                bird.flap()
+        if game_paused:
+            pass
+        elif dying:
+            update_death()
+        elif game_started and not game_over:
+            move()
+            if dark_mode:
+                update_parallax()
 
-    if game_paused:
-        pass
-    elif dying:
-        update_death()
-    elif game_started and not game_over:
-        move()
-        if dark_mode:
-            update_parallax()
+        draw()
 
-    draw()
+        if shake_x != 0 or shake_y != 0:
+            shaken = window.copy()
+            window.fill((0, 0, 0))
+            window.blit(shaken, (shake_x, shake_y))
 
-    if shake_x != 0 or shake_y != 0:
-        shaken = window.copy()
-        window.fill((0, 0, 0))
-        window.blit(shaken, (shake_x, shake_y))
+        pygame.display.update()
+        clock.tick(FPS)
+        await asyncio.sleep(0)
 
-    pygame.display.update()
-    clock.tick(FPS)
 
+asyncio.run(main())
